@@ -23,7 +23,7 @@ interval_dd = html.Div([
             )])
 provider_dd =html.Div( [
             dbc.Label('Chose Providers to add:'),
-            dcc.Dropdown(get_provider_groups(),value=[],multi=True,id='provider-dropdown')
+            dcc.Dropdown(value=[],multi=True,id='provider-dropdown')
         ])
 
 quantity_selection = html.Div([
@@ -73,6 +73,15 @@ app.layout = dbc.Container([
 def update_fig(product,interval,provider,qty):
     fig = create_figure(product=product,interval=interval,filter_groups=provider,qty=qty)
     return fig
+
+@app.callback(
+    Output('provider-dropdown', "options"),
+    Input('product-dropdown', "value"),
+)
+def set_provider_options(product):
+    return (
+        get_provider_groups(product)
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
