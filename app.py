@@ -14,6 +14,7 @@ product_dd = html.Div([
                 id='product-dropdown',
                 placeholder='Select a product'
             )])
+
 interval_dd = html.Div([
             dbc.Label('Interval Selection:'),
             dcc.Dropdown(
@@ -49,11 +50,13 @@ controls = dbc.Card(
 
 fig_layout = dbc.Card(dcc.Graph(id='main-graph'), className="mt-3")
 
+
 app.layout = dbc.Container([
     html.Div([
     dbc.Row([
-        dbc.Col(html.H1('WV Commercial Claims Data',className="bg-primary text-white p-3 rounded mb-4"))
-    ]),
+    dbc.Col(html.H1('WV Commercial Claims Data',className="text-white p-3 rounded mb-4", style={'background-color':'#091851'}),width=9),
+        dbc.Col(html.Img(src='assets/final logo (1).png'), width=3,className='p-3')
+    ],justify="between"),
     dbc.Row([
         dbc.Col(controls)
     ]),
