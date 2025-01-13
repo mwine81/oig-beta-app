@@ -5,7 +5,6 @@ import plotly.express as px
 import re
 
 DATA = Path('__main__').parent / 'data/claims_clean.parquet'
-
 interval_dict = {
   'Week':'1w',
    'Quarter':'1q',
