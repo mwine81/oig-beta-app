@@ -62,7 +62,7 @@ app.layout = dbc.Container([
     ]),
     dbc.Row([
         dbc.Col([fig_layout])
-    ])
+    ]),
     ],className = 'bg-light p-4 rounded')
 ],className="p-4")
 

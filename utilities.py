@@ -74,13 +74,18 @@ def create_figure(product,interval,filter_groups, qty):
                     line_dash='variable',
                   )
     fig.update_layout(
-        yaxis_tickformat = '$,.2f',
+        yaxis_tickformat = '$,.0f',
         title_subtitle_text=f"Express Scripts WV NADAC OIG Reporting 2023-2024 (Average by {interval})",
         plot_bgcolor='white',
         legend_x = .90,
         legend_y = 1.2,
+        hovermode='x unified'
     )
-    fig.update_traces(opacity=0.60)
+    fig.update_traces(
+        opacity=0.60,
+        #mode='lines+markers',
+        hovertemplate='<b>%{y:$,.2f}<b>'
+    )
     fig.update_yaxes(
         ticksuffix = '      ',
         tickfont=dict(
@@ -99,6 +104,7 @@ def create_figure(product,interval,filter_groups, qty):
     )
     fig.update_traces(
         line=dict(width=3),
+
     )
     return fig
 
