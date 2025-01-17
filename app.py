@@ -29,7 +29,7 @@ provider_dd =html.Div( [
 
 quantity_selection = html.Div([
     dbc.Label('Quantity Selection:'),
-    dcc.Dropdown([x for x in range(100)],
+    dcc.Dropdown([x for x in range(1000)],
                 value=60,
                 id='input-qty',)
     ])
@@ -64,7 +64,7 @@ app.layout = dbc.Container([
         dbc.Col([fig_layout])
     ]),
     ],className = 'bg-light p-4 rounded')
-],className="p-4")
+],className="p-4",fluid=True)
 
 @callback(
     Output('main-graph', 'figure'),
