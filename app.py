@@ -153,7 +153,7 @@ app.layout = dbc.Container(
                     [
                         dbc.Col(html.H1("WV Commercial Claims Data", className="text-white p-3 rounded mb-4",
                                         style={"backgroundColor": "#091851"}), width=9),
-                        dbc.Col(html.Img(src="assets/final logo (1).png"), width=2, className="p-3", align='center'),
+                        dbc.Col(html.Img(src="assets/final logo (1).png"), width=3, className="p-3"),
                     ],
                     justify="between",
                 ),
