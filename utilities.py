@@ -239,7 +239,7 @@ def provider_frame(data, min_rx_count, col_to_rank, top_n):
         )
         .with_columns(margin())
         .with_columns(per_rx())
-        .with_columns(c.group_name.is_in(affilated_pharamcy_list()).alias("is_affiliated"))
+        .with_columns(c.group_name.is_in(affiliated_pharmacy_list()).alias("is_affiliated"))
         .sql("""select *, case when group_name like '%All Other%' then group_name
         when is_affiliated = true then 'Affiliated' else 'Non-Affiliated'
         end as color_col from self""")
@@ -249,7 +249,7 @@ def provider_frame(data, min_rx_count, col_to_rank, top_n):
         .sort(by=col_to_rank, descending=True)
     )
 
-def affilated_pharamcy_list():
+def affiliated_pharmacy_list():
     return (
         load_scanned_data(None, None, None, None)
         .filter(c.affiliated)
