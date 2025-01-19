@@ -2,7 +2,7 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import html, dcc, Input, Output, callback, State
 from utilities import get_product_list, get_interval, create_figure, get_provider_groups, percent_of_total_frame, \
-    percent_total_fig
+    percent_total_fig, load_scanned_data, provider_frame, provider_fig, COL_TO_RK_DICT
 
 # Constants
 DEFAULT_PRODUCT = 'Atorvastatin Calcium Oral Tablet 20 MG'
@@ -126,38 +126,18 @@ agg_controls = dbc.Card(
         specialty_radio_group,
         dbc.Label("Brand/Generic:", className="fw-bold"),
         b_g_radio_group,
+        dbc.Label("Provider Column To Rank:", className="fw-bold"),
+        dcc.Dropdown({v:k for k,v in COL_TO_RK_DICT.items()},value='margin_per_rx', id="provider-col-to-rank"),
+        dbc.Label("Minimum Number Of Rxs For Ranking:", className="fw-bold"),
+        dcc.Input(10, type="number", id="min-rxs-for-rank",min=1),
+        dbc.Label("Number Of Providers to Rank:", className="fw-bold"),
+        dcc.Input(10, type="number", id="top-n-providers",min=1),
+        dbc.Label("Provider Column To Chart:", className="fw-bold"),
+        dcc.Dropdown({v: k for k, v in COL_TO_RK_DICT.items()}, value='margin_per_rx', id="provider-col-to-chart"),
     ],className='p-2'
 )
 
-collapse = html.Div(
-    [
-        dbc.Button(
-            "Open collapse",
-            id="horizontal-collapse-button",
-            className="mb-3",
-            color="primary",
-            n_clicks=0,
-        ),
-        html.Div(
-            dbc.Collapse(
-                dbc.Card(
-                    dbc.CardBody(
-                        "This content appeared horizontally due to the "
-                        "`dimension` attribute"
-                    ),
-                    style={"width": "400px"},
-                ),
-                id="horizontal-collapse",
-                is_open=False,
-                dimension="width",
-            ),
-            style={"minHeight": "100px"},
-        ),
-    ]
-)
-
-
-
+provider_fig_card = dbc.Card(dcc.Graph(id="provider-fig"), className="mt-3")
 
 agg_fig_card = dbc.Card(dcc.Graph(id="agg-analysis"))
 
@@ -186,6 +166,7 @@ app.layout = dbc.Container(
                     ],
                     className="mt-4 bg-light",
                 ),
+                dbc.Row(dbc.Col(provider_fig_card))
             ],
             className="bg-light p-3 rounded",
         )
@@ -206,7 +187,6 @@ app.layout = dbc.Container(
 def update_fig(product, interval, provider, qty):
     return create_figure(product=product, interval=interval, filter_groups=provider, qty=qty)
 
-
 @app.callback(
     Output("provider-dropdown", "options"),
     Input("product-dropdown", "value"),
@@ -221,10 +201,28 @@ def update_provider_options(product):
     Input("product-dropdown", "value"),
     Input("specialty", "value"),
     Input("b_g", "value"),
+
 )
 def update_agg_fig(use_drug, product, specialty_selection,is_brand):
     data = percent_of_total_frame(use_drug, product, specialty_selection,is_brand)
     return percent_total_fig(data)
+
+
+@app.callback(
+    Output("provider-fig", "figure"),
+    Input("agg-type", "value"),
+    Input("product-dropdown", "value"),
+    Input("specialty", "value"),
+    Input("b_g", "value"),
+    Input("provider-col-to-rank", "value"),
+    Input("min-rxs-for-rank", "value"),
+    Input("top-n-providers", "value"),
+    Input("provider-col-to-chart", "value"),
+)
+def update_provider_fig(use_drug, product, specialty_selection,is_brand, rk_col, min_rx_for_inclusion,number_providers_to_show_in_fig,provider_col_to_chart_for_fig):
+    data = load_scanned_data(is_brand, product, specialty_selection,use_drug)
+    provider_fig_data = provider_frame(data,min_rx_for_inclusion,rk_col,number_providers_to_show_in_fig)
+    return provider_fig(provider_fig_data.collect(),provider_col_to_chart_for_fig,number_providers_to_show_in_fig)
 
 
 if __name__ == '__main__':

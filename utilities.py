@@ -4,6 +4,7 @@ from polars import col as c
 import plotly.express as px
 import re
 
+
 DATA = Path('__main__').parent / 'data/claims_clean.parquet'
 interval_dict = {
   'Week':'1w',
@@ -116,12 +117,12 @@ REPLACEMENT_MAP = {
     'margin': "Margin Over NADAC"
 }
 AFFILIATED_MAP = {'true': 'Affiliated', 'false': 'Non-Affiliated'}
-COLOR_MAP = {'Affiliated': '#0077BE', 'Non-Affiliated': '#091851'}
+COLOR_MAP = {'Affiliated': '#0077BE', 'Non-Affiliated': '#091851','All Others Combined':'#808080'}
 
 
 # Helper function: Apply aggregations
-def apply_aggregation(data):
-    return data.group_by(c.affiliated).agg(
+def apply_aggregation(data,group_by_col):
+    return data.group_by(group_by_col).agg(
         pl.len().alias('rx_count'),
         c.nadac.sum(),
         c.icp.sum(),
@@ -139,21 +140,24 @@ def apply_calculation(data):
     ).sort(c.affiliated)
 
 
-# Main function: Percent of total frame
-def percent_of_total_frame(use_drug, product,specialty_selection,b_g):
+def load_scanned_data(b_g, product, specialty_selection, use_drug):
     scanned_data = pl.scan_parquet(DATA)
     if use_drug == 'Selected Drug':
         scanned_data = scanned_data.filter(c.product == product)
     if specialty_selection == 'Specialty':
         scanned_data = scanned_data.filter(c.is_special)
-    if specialty_selection == 'Non-Specialty':
+    if specialty_selection == 'Non Specialty':
         scanned_data = scanned_data.filter(c.is_special == False)
     if b_g == 1:
         scanned_data = scanned_data.filter(c.is_brand == True)
     if b_g == 0:
         scanned_data = scanned_data.filter(c.is_brand == False)
+    return scanned_data
 
-    aggregated_data = apply_aggregation(scanned_data)  # Apply aggregation
+# Main function: Percent of total frame
+def percent_of_total_frame(use_drug, product,specialty_selection,b_g):
+    scanned_data = load_scanned_data(b_g, product, specialty_selection, use_drug)
+    aggregated_data = apply_aggregation(scanned_data,c.affiliated)  # Apply aggregation
     return apply_calculation(aggregated_data).collect()  # Perform calculations
 
 
@@ -166,7 +170,7 @@ def percent_total_fig(data):
         color='affiliated',
         barmode='relative',
         text='value',
-        title='Affiliated vs Non-Affiliated',
+        title='Affiliated vs Non-Affiliated (Percent of Total)',
         color_discrete_map=COLOR_MAP,
         category_orders=CATEGORY_ORDER
     )
@@ -183,4 +187,101 @@ def percent_total_fig(data):
     )
     return fig
 
+
+AGG_COL = ["nadac", "icp", "rx_count", "qty"]
+
+COL_TO_RK_DICT = {
+    'Total Nadac':"nadac",
+    'Total Incredient Cost Paid':"icp",
+    'Total Rx Count':"rx_count",
+    'Total Units Dispensed':"qty",
+    'Total Margin Over NADAC':"margin",
+    'Average NADAC Per Rx':"nadac_per_rx",
+    'Average Ingredient Cost Paid Per Rx':"icp_per_rx",
+    'Average Units Dispensed Per Rx':"qty_per_rx",
+    'Average Margin Over NADAC Per Rx':"margin_per_rx",
+}
+
+
+def margin():
+    return (c.icp - c.nadac).alias("margin")
+
+
+def per_rx():
+    return (pl.col(AGG_COL + ["margin"]) / c.rx_count).name.suffix("_per_rx")
+
+
+def top_n_w_other_grouping(top_n):
+    return (
+        pl.when(c.rk <= top_n)
+        .then(c.group_name)
+        .otherwise(pl.lit("All Others Combined"))
+        .alias("group_name")
+    )
+
+
+def ranking_col(col_to_rank):
+    return pl.col(col_to_rank).rank(descending=True).alias("rk")
+
+
+def provider_frame(data, min_rx_count, col_to_rank, top_n):
+    return (
+        data.pipe(apply_aggregation, c.group_name)
+        .filter(c.rx_count >= min_rx_count)
+        .with_columns(margin())
+        .with_columns(per_rx())
+        .with_columns(c.group_name.cast(pl.String))
+        .with_columns(ranking_col(col_to_rank))
+        .with_columns(top_n_w_other_grouping(top_n))
+        .group_by("group_name")
+        .agg(
+            pl.col(AGG_COL).sum(),
+        )
+        .with_columns(margin())
+        .with_columns(per_rx())
+        .with_columns(c.group_name.is_in(affilated_pharamcy_list()).alias("is_affiliated"))
+        .sql("""select *, case when group_name like '%All Other%' then group_name
+        when is_affiliated = true then 'Affiliated' else 'Non-Affiliated'
+        end as color_col from self""")
+        .drop('rx_count_per_rx')
+        .with_columns(c.rx_count.cast(pl.Int32))
+        .with_columns(pl.col(pl.Float32).round(2))
+        .sort(by=col_to_rank, descending=True)
+    )
+
+def affilated_pharamcy_list():
+    return (
+        load_scanned_data(None, None, None, None)
+        .filter(c.affiliated)
+        .select(c.group_name)
+        .unique()
+        .collect()
+        .to_series()
+        .to_list()
+    )
+
+def provider_fig(data,x_value,n_to_rank):
+    display_by = {v:k for k,v in COL_TO_RK_DICT.items()}.get(x_value)
+    fig = px.bar(
+        data,
+        x=x_value,
+        y='group_name',
+        color='color_col',
+        text_auto=True,
+        title='Affiliated vs Non-Affiliated',
+        color_discrete_map=COLOR_MAP,
+        category_orders={"group_name": ['Affiliated', 'Non-Affiliated', 'All Others Combined']},
+        height=70*n_to_rank
+    )
+    fig.update_layout(yaxis={'categoryorder': 'total descending'},
+                      title_subtitle_text=f'(Top {n_to_rank} Providers by {display_by})'
+                      )
+    fig.update_xaxes(showticklabels=False, title_text='')
+
+    fig.update_xaxes(title_text=display_by,showticklabels=False,)
+    fig.update_yaxes(title_text='Provider', ticksuffix=' ')
+    fig.update_layout(
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, x=.65, title_text="")
+    )
+    return fig
 
